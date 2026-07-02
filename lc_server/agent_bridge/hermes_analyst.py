@@ -111,7 +111,7 @@ def _default_analyst_agent_factory(
     else:
         system_prompt = ANALYST_SYSTEM_PROMPT
         toolsets = list(ANALYST_TOOLSETS)
-        max_iterations = 15
+        max_iterations = 8
         platform = "livingcolor-delivery"
 
     from lc_server.agent_bridge.inference_config import (

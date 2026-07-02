@@ -132,7 +132,7 @@ def _default_planner_agent_factory(
     else:
         system_prompt = PLANNER_SYSTEM_PROMPT
         toolsets = list(PLANNER_TOOLSETS)
-        max_iterations = 20
+        max_iterations = 12
         platform = "livingcolor-delivery"
 
     from lc_server.agent_bridge.inference_config import (

@@ -40,4 +40,4 @@ def test_reporter_template_renders_valid_manifest():
 def test_manifest_declares_reporter_role():
     manifest = json.loads((TEMPLATES_DIR / "manifest.json").read_text(encoding="utf-8"))
     assert "reporter" in manifest["roles"]
-    assert manifest["version"] == "1.8.0"
+    assert manifest["version"] == "1.9.0"
