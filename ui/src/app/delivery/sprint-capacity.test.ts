@@ -36,6 +36,22 @@ describe('sprint-capacity', () => {
     expect(computeSprintUsedDays([ticket])).toBe(2)
   })
 
+  it('does not count non-selected ready tickets (over capacity backlog)', () => {
+    const ticket = {
+      readinessId: 'RD-3',
+      jiraKey: 'BN-3',
+      title: 'Overflow',
+      estimatedDays: 3,
+      priorityRank: 1,
+      urgencyScore: 0,
+      warnings: [],
+      readinessStatus: 'ready',
+      sprintSelected: false
+    }
+    expect(ticketCountsTowardSprintCapacity(ticket)).toBe(false)
+    expect(computeSprintUsedDays([ticket])).toBe(0)
+  })
+
   it('excludes carry-over in-development tickets', () => {
     const ticket = {
       readinessId: 'RD-9',

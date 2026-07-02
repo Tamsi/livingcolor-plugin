@@ -13,7 +13,11 @@ export function ticketCountsTowardSprintCapacity(ticket: SprintTicket): boolean 
     }
     return (ticket.readinessStatus ?? '').trim().toLowerCase() === 'ready'
   }
-  return (ticket.readinessStatus ?? 'ready').trim().toLowerCase() === 'ready'
+  const ready = (ticket.readinessStatus ?? 'ready').trim().toLowerCase() === 'ready'
+  if (ticket.sprintSelected != null) {
+    return ticket.sprintSelected && ready
+  }
+  return ready
 }
 
 export function computeSprintUsedDays(tickets: SprintTicket[]): number {
