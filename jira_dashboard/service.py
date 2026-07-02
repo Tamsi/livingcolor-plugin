@@ -159,6 +159,21 @@ def _parse_mcp_json_payload(parsed: dict) -> Any:
     return result
 
 
+def _unwrap_stringified_result(node: Any) -> Any:
+    """Unwrap MCP payloads where the useful JSON lives in a string ``result`` field."""
+    if not isinstance(node, dict):
+        return node
+    inner = node.get("result")
+    if isinstance(inner, str):
+        try:
+            parsed = json.loads(inner)
+            if isinstance(parsed, (dict, list)):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+    return node
+
+
 def _parse_tool_payload(parsed: dict) -> Any:
     if parsed.get("error"):
         raise JiraDashboardError(str(parsed["error"]))
@@ -177,6 +192,11 @@ def _parse_tool_payload(parsed: dict) -> Any:
         if isinstance(result, dict) and _extract_issues(result):
             return result
         if isinstance(result, list) and result:
+            return result
+        unwrapped_structured = _unwrap_stringified_result(structured)
+        if _extract_single_issue(unwrapped_structured):
+            return unwrapped_structured
+        if isinstance(result, dict) and _extract_single_issue(result):
             return result
         if isinstance(structured, dict) and structured:
             return structured
