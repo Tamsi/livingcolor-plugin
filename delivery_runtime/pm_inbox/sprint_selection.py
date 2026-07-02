@@ -169,7 +169,7 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
     backlog_extras = [
         item
         for item in candidates
-        if item.get("readinessStatus") != "ready"
+        if item.get("readinessStatus") != "ready" or item["jiraKey"] not in selected_ready_keys
     ]
     backlog_extras.sort(
         key=lambda item: (
@@ -182,8 +182,6 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
         )
     )
     for item in backlog_extras:
-        if item.get("readinessStatus") == "ready" and item["jiraKey"] in selected_ready_keys:
-            continue
         status = str(item.get("readinessStatus") or "")
         warnings: list[str] = []
         if status == "needs_clarification":
@@ -192,6 +190,8 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
             warnings.append("Not ready for autonomous delivery")
         elif status == "analysis_failed":
             warnings.append(_ANALYSIS_FAILED_WARNING)
+        elif status == "ready":
+            warnings.append("Ready but over sprint capacity")
         _append_latest_analysis_warning(warnings, item)
         tickets_payload.append(
             {
@@ -201,7 +201,7 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
                 "estimatedDays": item["estimatedDays"],
                 "priorityRank": _priority_rank(item.get("jiraSnapshot") or {}),
                 "urgencyScore": 0.0,
-                "sprintSelected": True,
+                "sprintSelected": False,
                 "warnings": warnings,
                 "readinessStatus": status,
                 "lastAnalysisError": item.get("lastAnalysisError"),
@@ -302,6 +302,8 @@ def _ticket_counts_toward_sprint_capacity(item: dict[str, Any]) -> bool:
         # Legacy payloads: sprint-committed tickets stay ready in the panel after approve dev.
         return str(item.get("readinessStatus") or item.get("readiness_status") or "").strip().lower() == "ready"
     status = str(item.get("readinessStatus") or item.get("readiness_status") or "ready").strip().lower()
+    if "sprintSelected" in item:
+        return bool(item.get("sprintSelected")) and status == "ready"
     return status == "ready"
 
 
