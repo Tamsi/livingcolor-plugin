@@ -24,8 +24,9 @@ _LIVINGCOLOR_ENV_TEMPLATE = """\
 # LivingColor product secrets (optional — ~/.hermes/.env is also loaded)
 # STRIPE_SECRET_KEY=sk_test_...
 # MoA tier: nemotron (default) | standard | premium
-# Analyst + planner use Nemotron Ultra MoA; developer stays on lc-developer (OpenRouter).
 # LIVINGCOLOR_MOA_TIER=standard
+# Use heuristic billing for reliable Stripe invoices (no LLM customer-id drift).
+# LIVINGCOLOR_SPRINT_BILLING_BACKEND=heuristic
 """
 
 

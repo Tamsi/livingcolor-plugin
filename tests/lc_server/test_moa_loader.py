@@ -7,7 +7,7 @@ def test_load_bundled_presets_contains_standard_and_premium():
     assert "lc-developer-premium" in presets
     assert presets["lc-developer"]["aggregator"]["model"] == "anthropic/claude-opus-4.8"
     assert presets["lc-developer-premium"]["aggregator"]["model"] == "anthropic/claude-opus-4.8"
-    assert bundled_preset_version() == "1.1.0"
+    assert bundled_preset_version() == "1.2.1"
 
 
 def test_load_bundled_presets_contains_nemotron_tier():
@@ -16,4 +16,4 @@ def test_load_bundled_presets_contains_nemotron_tier():
     assert "lc-planner-nemotron" in presets
     assert "lc-developer-nemotron" not in presets
     assert presets["lc-planner-nemotron"]["aggregator"]["provider"] == "nvidia"
-    assert presets["lc-planner-nemotron"]["aggregator"]["model"] == "nvidia/nemotron-3-ultra-550b-a55b"
+    assert presets["lc-planner-nemotron"]["aggregator"]["model"] == "nvidia/nemotron-3-super-120b-a12b"

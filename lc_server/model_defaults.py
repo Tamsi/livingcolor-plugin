@@ -8,7 +8,7 @@ LIVINGCOLOR_PROVIDER = "openrouter"
 LIVINGCOLOR_MOA_PROVIDER = "moa"
 
 # Orchestration-oriented roles: Jira analysis, Gate 1 planning, sprint documentation.
-LIVINGCOLOR_ORCHESTRATION_MODEL = "openrouter/owl-alpha"
+LIVINGCOLOR_ORCHESTRATION_MODEL = "anthropic/claude-sonnet-4.6"
 LIVINGCOLOR_ORCHESTRATION_PROVIDER = LIVINGCOLOR_PROVIDER
 
 # Single-model fallbacks when MoA presets are disabled or missing.

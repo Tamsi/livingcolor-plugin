@@ -24,7 +24,7 @@ def test_role_defaults_use_moa_presets():
     assert LIVINGCOLOR_PLANNER_MODEL == "lc-planner-nemotron"
     assert LIVINGCOLOR_DEVELOPER_MODEL == "lc-developer"
     assert LIVINGCOLOR_REPORTER_PROVIDER == "openrouter"
-    assert LIVINGCOLOR_REPORTER_MODEL == "openrouter/owl-alpha"
+    assert LIVINGCOLOR_REPORTER_MODEL == "anthropic/claude-sonnet-4.6"
     assert LIVINGCOLOR_PUBLISHER_PROVIDER == "openrouter"
     assert LIVINGCOLOR_PUBLISHER_MODEL == "deepseek/deepseek-v4-pro"
 
@@ -208,11 +208,11 @@ def test_moa_fallback_when_preset_disabled(monkeypatch, tmp_path):
     model, provider = resolve_moa_or_fallback(
         "lc-analyst",
         "moa",
-        fallback_model="openrouter/owl-alpha",
+        fallback_model="anthropic/claude-sonnet-4.6",
         fallback_provider="openrouter",
     )
 
-    assert model == "openrouter/owl-alpha"
+    assert model == "anthropic/claude-sonnet-4.6"
     assert provider == "openrouter"
 
 
@@ -222,7 +222,7 @@ def test_moa_fallback_passthrough_when_not_moa():
     model, provider = resolve_moa_or_fallback(
         "deepseek/deepseek-v4-pro",
         "openrouter",
-        fallback_model="openrouter/owl-alpha",
+        fallback_model="anthropic/claude-sonnet-4.6",
         fallback_provider="openrouter",
     )
 

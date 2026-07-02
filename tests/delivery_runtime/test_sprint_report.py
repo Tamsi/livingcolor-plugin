@@ -272,6 +272,74 @@ def test_publish_sprint_report_creates_invoice_and_includes_url(_isolate_hermes_
     assert second["invoiceUrl"] == "https://invoice.stripe.com/in_123"
 
 
+def test_publish_sprint_report_aligns_wrong_llm_customer_id(_isolate_hermes_home):
+    from delivery_runtime.readiness.project_settings import persist_project_billing_settings
+
+    project_key = "BN"
+    save_delivery_project_config(duration_days=14, capacity_days=15, project_key=project_key)
+    persist_project_billing_settings(
+        project_key=project_key,
+        stripe_customer_id="cus_123",
+        daily_rate_cents=80000,
+        currency="eur",
+        invoice_mode="draft",
+        approval_required=False,
+        max_invoice_cents=500000,
+    )
+    _seed_sprint_state(project_key=project_key, sprint_number=2, end_date="2026-06-16")
+
+    now = utc_now_iso()
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO work_orders (
+                id, jira_key, readiness_id, title, description, priority, status,
+                current_stage, confidence, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("WO-1", "BN-1", "RD-BN-1", "First ticket", "", "High", "completed", "done", 0.9, now, now),
+        )
+
+    def fake_billing_agent(snapshot, key):
+        return {
+            "customerId": "cus_wrong",
+            "currency": "usd",
+            "lineItems": [
+                {
+                    "description": "Delivered BN-1",
+                    "ticketKeys": ["BN-1"],
+                    "quantityDays": 2.0,
+                    "unitAmountCents": 80000,
+                }
+            ],
+            "memo": "Sprint 2 delivery invoice",
+            "warnings": [],
+        }
+
+    def fake_stripe_invoice(validated, *, invoice_mode):
+        assert validated["customerId"] == "cus_123"
+        assert validated["currency"] == "eur"
+        return {
+            "invoiceId": "in_456",
+            "invoiceStatus": "draft",
+            "invoiceTotalCents": 160000,
+            "invoiceCurrency": "eur",
+            "invoiceUrl": "https://invoice.stripe.com/in_456",
+            "invoicePdfUrl": None,
+        }
+
+    result = publish_sprint_report(
+        project_key=project_key,
+        reporter=lambda snapshot, key: "Sprint report",
+        sender=lambda message: {"success": True, "platform": "slack"},
+        billing_agent=fake_billing_agent,
+        invoice_creator=fake_stripe_invoice,
+    )
+
+    assert result["billingStatus"] == "draft_created"
+    assert result["invoiceUrl"] == "https://invoice.stripe.com/in_456"
+
+
 def test_publish_sprint_report_skips_invoice_when_config_missing(_isolate_hermes_home):
     project_key = "BN"
     save_delivery_project_config(duration_days=14, capacity_days=15, project_key=project_key)

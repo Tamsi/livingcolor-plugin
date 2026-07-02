@@ -28,7 +28,7 @@ def test_reporter_template_renders_valid_manifest():
     assert manifest.runtime.type == "hermes"
     assert manifest.runtime.max_iterations == 8
     assert manifest.runtime.toolsets == ()
-    assert manifest.runtime.model == "openrouter/owl-alpha"
+    assert manifest.runtime.model == "anthropic/claude-sonnet-4.6"
     assert manifest.runtime.provider == "openrouter"
     assert "Sprint Reporter Agent" in manifest.prompt.system
     assert manifest.context["projectKey"] == "BN"
@@ -40,4 +40,4 @@ def test_reporter_template_renders_valid_manifest():
 def test_manifest_declares_reporter_role():
     manifest = json.loads((TEMPLATES_DIR / "manifest.json").read_text(encoding="utf-8"))
     assert "reporter" in manifest["roles"]
-    assert manifest["version"] == "1.7.0"
+    assert manifest["version"] == "1.8.0"

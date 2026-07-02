@@ -220,6 +220,17 @@ def _billing_skip(reason: str) -> dict[str, Any]:
     return {"status": "skipped", "warning": reason}
 
 
+def _align_proposal_with_billing_snapshot(
+    proposal: dict[str, Any],
+    billing_snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    """Pin immutable billing fields from the snapshot so LLM drift cannot fail validation."""
+    aligned = dict(proposal)
+    aligned["customerId"] = str(billing_snapshot.get("customerId") or "").strip()
+    aligned["currency"] = str(billing_snapshot.get("currency") or "eur").strip().lower()
+    return aligned
+
+
 def _default_billing_agent(snapshot: dict[str, Any], project_key: str) -> dict[str, Any]:
     import os
 
@@ -299,7 +310,7 @@ def _create_or_reuse_sprint_invoice(
     create_invoice = invoice_creator or _default_invoice_creator
 
     try:
-        proposal = propose(billing_snapshot, project_key)
+        proposal = _align_proposal_with_billing_snapshot(propose(billing_snapshot, project_key), billing_snapshot)
         EventStore().append(
             event_type="SPRINT_INVOICE_PROPOSED",
             actor=actor,

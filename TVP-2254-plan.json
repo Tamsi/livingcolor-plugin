@@ -1,0 +1,18 @@
+{
+  "needsClarification": false,
+  "clarificationReason": "",
+  "ticketUnderstanding": "The ticket TVP-2254 requires harmonizing the Airship property for country name between web and mobile apps. The web currently uses 'country' in some places while mobile apps use 'nom_pays'. Analysis shows the Airship channel attribute is already set to 'nom_pays' in assets/js/airship.js, but the trackAirshipEvent call for the 'geolocalisation' event still sends {country: countryCode}. Additionally, comments and log messages reference the old 'country attribute' terminology. The goal is to align all Airship-facing property names to 'nom_pays'.",
+  "targetRepo": "tv5monde/tv5mondeplus-front",
+  "implementationPlan": "1. Verify the Airship channel attribute is correctly set to 'nom_pays' in assets/js/airship.js (lines 141 and 403).\n2. Update the trackAirshipEvent call in assets/js/airship.js line 144 from {country: countryCode} to {nom_pays: countryCode} to ensure the geolocalisation event uses the harmonized property name.\n3. Update comments and log messages in assets/js/airship.js that reference 'country attribute' to 'nom_pays attribute' for clarity (lines 112, 117, 126, 131, 138, 142, 153).\n4. Update similar console.warn messages in assets/js/auth.js lines 46 and 400 to reference 'Airship nom_pays attribute' instead of 'Airship country attribute'.\n5. Evaluate the cookie named 'airship_country' (line 146 in airship.js). Since it is an internal cookie and not explicitly mentioned in the ticket, leave it unchanged to avoid potential breaking changes unless further analysis shows it is safe to rename.\n6. Run the existing test suite (npm test) to ensure no regressions are introduced.\n7. If tests pass, prepare a commit with a message referencing TVP-2254 and open a merge request for review.",
+  "likelyImpactedFiles": [
+    "assets/js/airship.js",
+    "assets/js/auth.js"
+  ],
+  "risks": [
+    "Changing the event property key from 'country' to 'nom_pays' in the geolocalisation event could break downstream Airship audience rules or analytics pipelines that rely on the 'country' key in that specific event. Coordination with the Airship/analytics team is recommended before making this change.",
+    "Updating comments and log messages poses no functional risk but ensures code clarity and maintainability.",
+    "Leaving the cookie 'airship_country' unchanged maintains consistency with existing code that may read this cookie, though it represents a minor inconsistency in naming. If the cookie is only used internally, renaming it to 'airship_nom_pays' could be considered in a separate ticket.",
+    "The backend AirshipService.php already uses 'nom_pays' for email channel attributes, so no backend changes are required."
+  ],
+  "confidenceLevel": 0.88
+}
