@@ -58,7 +58,8 @@ install_stripe() {
 sync_plugin() {
   log "Syncing LivingColor plugin from ${ROOT}"
   "${ROOT}/scripts/sync-hermes-plugin.sh"
-  hermes plugins enable livingcolor 2>/dev/null || true
+  # Non-interactive: cloud agents cannot answer Hermes tool-override prompts.
+  hermes plugins enable livingcolor --no-allow-tool-override 2>/dev/null || true
 }
 
 write_project_mapping() {
