@@ -640,6 +640,13 @@ def update_project_config(body: ProjectConfigUpdateRequest, request: Request) ->
             persist_project_vcs_provider(target_key, body.vcs)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if body.sprintCapacityDays is not None or body.sprintDurationDays is not None:
+        try:
+            from delivery_runtime.pm_inbox.sprint_selection import rebuild_and_persist_selected_sprint
+
+            rebuild_and_persist_selected_sprint(project_key=target_key)
+        except Exception:  # noqa: BLE001 - settings save must not fail on rebuild
+            _log.warning("Sprint rebuild after config change failed", exc_info=True)
     config = load_delivery_automation_config(project_key=request_key)
     project_key = request_key or config.project_key
     project_name = _project_name_for_key(project_key, config.project_name)

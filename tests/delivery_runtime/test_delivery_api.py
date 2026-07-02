@@ -48,6 +48,33 @@ def _seed_ready_record(jira_key: str = "AAC-9") -> str:
     return record_id
 
 
+def _seed_estimated_ready_record(jira_key: str, estimated_days: float) -> str:
+    init_db()
+    with connect() as conn:
+        record_id = next_public_id(conn, "RD")
+        now = utc_now_iso()
+        snapshot = {
+            "key": jira_key,
+            "summary": f"Ticket {jira_key}",
+            "description": "Acceptance criteria: do the thing.",
+            "status": "To Do",
+            "issueType": "Story",
+            "projectKey": "BN",
+            "priority": "High",
+        }
+        conn.execute(
+            """
+            INSERT INTO readiness_records (
+                id, jira_key, project_key, title, readiness_score, readiness_status,
+                analysis_summary, blockers_json, recommended_repos_json, confidence,
+                estimated_days, jira_snapshot_json, analyzed_at, created_at, updated_at
+            ) VALUES (?, ?, 'BN', ?, 82, 'ready', 'Ready', '[]', '[]', 0.82, ?, ?, ?, ?, ?)
+            """,
+            (record_id, jira_key, snapshot["summary"], estimated_days, json_dumps(snapshot), now, now, now),
+        )
+    return record_id
+
+
 class TestDeliveryApi:
     @pytest.fixture(autouse=True)
     def _setup(self, _isolate_hermes_home):
@@ -218,6 +245,67 @@ class TestDeliveryApi:
         assert reload.json()["sprintCapacityDays"] == 18.5
         assert reload.json()["communicationLanguage"] == "en"
 
+    def test_put_project_config_rebuilds_selected_sprint(self, tmp_path, monkeypatch):
+        from delivery_runtime.automation import config as automation_config
+        from delivery_runtime.pm_inbox import store as pm_store
+
+        home = tmp_path / "livingcolor"
+        monkeypatch.setattr(automation_config, "get_livingcolor_home", lambda: home)
+        _seed_estimated_ready_record("BN-901", 1.0)
+        _seed_estimated_ready_record("BN-902", 3.0)
+
+        response = self.client.put(
+            "/api/delivery/project-config",
+            json={"sprintCapacityDays": 1.0, "sprintDurationDays": 7},
+        )
+        assert response.status_code == 200
+
+        state = pm_store.get_sprint_state(project_key="BN")
+        recommendation = (state or {}).get("recommendation") or {}
+        assert recommendation.get("capacityDays") == 1.0
+        assert recommendation.get("usedDays", 0) <= 1.0
+        selected = [
+            ticket["jiraKey"]
+            for ticket in recommendation.get("tickets") or []
+            if ticket.get("sprintSelected") and ticket.get("readinessStatus") == "ready"
+        ]
+        assert selected == ["BN-901"]
+
+    def test_put_project_config_respects_manual_override(self, tmp_path, monkeypatch):
+        from delivery_runtime.automation import config as automation_config
+        from delivery_runtime.persistence.db import connect as db_connect
+        from delivery_runtime.pm_inbox import store as pm_store
+
+        home = tmp_path / "livingcolor"
+        monkeypatch.setattr(automation_config, "get_livingcolor_home", lambda: home)
+        init_db()
+        sentinel = {
+            "sprintName": "Manual",
+            "capacityDays": 9.0,
+            "usedDays": 0.0,
+            "durationDays": 14,
+            "tickets": [],
+        }
+        with db_connect() as conn:
+            pm_store.upsert_sprint_state(
+                conn,
+                project_key="BN",
+                sprint_name="Manual",
+                capacity_days=9.0,
+                duration_days=14,
+                recommendation=sentinel,
+                memory_patch={"manualOverride": True},
+            )
+
+        response = self.client.put(
+            "/api/delivery/project-config",
+            json={"sprintCapacityDays": 1.0, "sprintDurationDays": 7},
+        )
+        assert response.status_code == 200
+
+        state = pm_store.get_sprint_state(project_key="BN")
+        assert (state or {}).get("recommendation") == sentinel
+
     def test_project_config_ticket_scope_is_scoped_by_request_project_key(self, tmp_path, monkeypatch):
         from delivery_runtime.automation import config as automation_config
         from delivery_runtime.readiness.project_mapping import load_project_mapping
@@ -342,8 +430,11 @@ class TestDeliveryApi:
         inbox = self.client.get("/api/delivery/pm-inbox?project=BN").json()
         selected = inbox["selectedSprint"]
         assert selected["capacityDays"] == 2
-        assert len(selected["tickets"]) == 1
-        assert selected["tickets"][0]["jiraKey"] == "BN-1"
+        tickets = {ticket["jiraKey"]: ticket for ticket in selected["tickets"]}
+        assert tickets["BN-1"]["sprintSelected"] is True
+        # Overflow ready ticket stays visible but is not selected.
+        assert tickets["BN-2"]["sprintSelected"] is False
+        assert selected["usedDays"] == 1.0
 
 
 class TestVcsReposApi:

@@ -335,6 +335,33 @@ def persist_selected_sprint(
         )
 
 
+def rebuild_and_persist_selected_sprint(*, project_key: str) -> dict[str, Any]:
+    """Rebuild the selected sprint from current settings and persist it.
+
+    Respects auto-reset and manual override, mirroring the daily pipeline.
+    """
+    from delivery_runtime.pm_inbox.sprint_reset import maybe_auto_reset_sprint
+
+    project_key = project_key.strip().upper()
+    auto_reset = maybe_auto_reset_sprint(project_key=project_key)
+    if auto_reset is not None:
+        return auto_reset
+
+    state = pm_store.get_sprint_state(project_key=project_key)
+    memory = (state or {}).get("memory") or {}
+    if isinstance(memory, dict) and memory.get("manualOverride"):
+        return (state or {}).get("recommendation") or build_selected_sprint_payload(project_key=project_key)
+
+    payload = build_selected_sprint_payload(project_key=project_key)
+    payload = merge_active_work_orders_into_sprint(payload, project_key=project_key)
+    persist_selected_sprint(
+        project_key=project_key,
+        payload=payload,
+        memory_patch={"emptyBacklogUntilAnalysis": False},
+    )
+    return payload
+
+
 def should_keep_empty_backlog(state: dict[str, Any] | None) -> bool:
     """True when a manual reset intentionally cleared sprint tickets until daily analysis."""
     if not state:

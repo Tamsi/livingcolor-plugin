@@ -384,31 +384,9 @@ class DailyAnalysisPipeline:
         return payload
 
     def _rebuild_selected_sprint(self, *, project_key: str) -> dict[str, Any]:
-        from delivery_runtime.pm_inbox.sprint_reset import maybe_auto_reset_sprint
-        from delivery_runtime.pm_inbox.sprint_selection import (
-            build_selected_sprint_payload,
-            merge_active_work_orders_into_sprint,
-            persist_selected_sprint,
-        )
-        from delivery_runtime.pm_inbox import store as pm_store
+        from delivery_runtime.pm_inbox.sprint_selection import rebuild_and_persist_selected_sprint
 
-        auto_reset = maybe_auto_reset_sprint(project_key=project_key)
-        if auto_reset is not None:
-            return auto_reset
-
-        state = pm_store.get_sprint_state(project_key=project_key)
-        memory = (state or {}).get("memory") or {}
-        if isinstance(memory, dict) and memory.get("manualOverride"):
-            return (state or {}).get("recommendation") or build_selected_sprint_payload(project_key=project_key)
-
-        payload = build_selected_sprint_payload(project_key=project_key)
-        payload = merge_active_work_orders_into_sprint(payload, project_key=project_key)
-        persist_selected_sprint(
-            project_key=project_key,
-            payload=payload,
-            memory_patch={"emptyBacklogUntilAnalysis": False},
-        )
-        return payload
+        return rebuild_and_persist_selected_sprint(project_key=project_key)
 
     def _refresh_project_memory(self, *, project_key: str, run_id: str) -> dict[str, Any]:
         from delivery_runtime.pm_inbox.repo_architecture import merge_repo_architecture

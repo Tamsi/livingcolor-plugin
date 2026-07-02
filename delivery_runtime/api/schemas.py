@@ -279,6 +279,7 @@ class SelectedSprintTicketResponse(BaseModel):
     urgencyScore: float = 0
     warnings: list[str] = Field(default_factory=list)
     readinessStatus: str | None = None
+    sprintSelected: bool | None = None
     lastAnalysisError: str | None = None
     lastAnalysisFailedAt: str | None = None
     workOrderId: str | None = None
