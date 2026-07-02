@@ -51,7 +51,7 @@ class ReadinessScanner:
         analysis_runner: Callable[[dict[str, Any], str], dict[str, Any]] | None = None,
         analysis_backend: AnalystBackend | None = None,
         cache_lookup: Callable[[str], AnalysisCacheEntry | None] | None = None,
-        analysis_concurrency: int = 3,
+        analysis_concurrency: int = 5,
     ) -> None:
         self.events = events or EventStore()
         self._issue_fetcher = issue_fetcher

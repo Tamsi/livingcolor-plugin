@@ -119,6 +119,18 @@ async def test_dispatcher_limits_concurrency_to_three():
 
 
 @pytest.mark.asyncio
+async def test_dispatcher_caps_concurrency_at_five():
+    backend = RecordingBackend()
+    dispatcher = ReadinessAnalysisDispatcher(backend=backend, concurrency=10)
+    snapshots = [_snapshot(f"TVP-{index}") for index in range(1, 13)]
+
+    result = await dispatcher.analyze_many(snapshots, project_key="TVP", run_id="DA-1", force=True)
+
+    assert result.summary.success == 12
+    assert backend.max_running <= 5
+
+
+@pytest.mark.asyncio
 async def test_dispatcher_uses_cache_when_not_forced():
     backend = RecordingBackend()
     snapshot = _snapshot("TVP-1")
@@ -187,7 +199,7 @@ async def test_summary_to_dict_uses_spec_shape_with_durations():
     summary = result.summary.to_dict()
 
     assert summary["backend"] == "recording"
-    assert summary["concurrency"] == 3
+    assert summary["concurrency"] == 5
     assert summary["forced"] is True
     assert "durationMs" in summary
     assert summary["items"][0]["jiraKey"] == "TVP-1"

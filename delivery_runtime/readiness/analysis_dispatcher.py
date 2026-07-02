@@ -106,12 +106,12 @@ class ReadinessAnalysisDispatcher:
         self,
         *,
         backend: AnalystBackend,
-        concurrency: int = 3,
+        concurrency: int = 5,
         cache_lookup: CacheLookup | None = None,
         per_ticket_timeout_sec: float = 180.0,
     ) -> None:
         self._backend = backend
-        self._concurrency = min(max(1, concurrency), 3)
+        self._concurrency = min(max(1, concurrency), 5)
         self._cache_lookup = cache_lookup
         self.per_ticket_timeout_sec = per_ticket_timeout_sec
 
