@@ -3,7 +3,7 @@ import type { PmInboxPayload, VcsProvider } from '@/lib/delivery'
 import { formatCodeReviewColumnTitle } from './review-request-labels'
 import type { WorkOrder } from './types'
 
-export type KanbanColumnId = 'sprint' | 'plan' | 'dev' | 'code_mr' | 'jira' | 'done'
+export type KanbanColumnId = 'sprint' | 'backlog' | 'plan' | 'dev' | 'code_mr' | 'jira' | 'done'
 
 export interface KanbanCard {
   id: string
@@ -38,6 +38,7 @@ const GATE_COLUMN: Record<string, KanbanColumnId> = {
 
 const GATE_CTA: Record<KanbanColumnId, string> = {
   sprint: 'Approve dev',
+  backlog: '',
   plan: 'Review plan',
   dev: '',
   code_mr: 'Review',
@@ -82,6 +83,7 @@ export function buildKanbanColumns(
 ): KanbanColumn[] {
   const columns: Record<KanbanColumnId, KanbanCard[]> = {
     sprint: [],
+    backlog: [],
     plan: [],
     dev: [],
     code_mr: [],
@@ -175,8 +177,12 @@ export function buildKanbanColumns(
       continue
     }
     const readinessId = ticket.readinessId?.trim()
-    columns.sprint.push({
-      id: `sprint-${readinessId || ticket.jiraKey}`,
+    const isReady = (ticket.readinessStatus ?? 'ready').trim().toLowerCase() === 'ready'
+    // Legacy persisted payloads only flagged selected ready tickets, hence the `?? true`.
+    const isSelected = (ticket.sprintSelected ?? true) && isReady
+    const targetColumn: KanbanColumnId = isSelected ? 'sprint' : 'backlog'
+    columns[targetColumn].push({
+      id: `${targetColumn}-${readinessId || ticket.jiraKey}`,
       jiraKey: ticket.jiraKey,
       title: ticket.title,
       readinessId: readinessId || undefined,
@@ -190,6 +196,7 @@ export function buildKanbanColumns(
 
   return [
     { id: 'sprint', title: 'Sprint', accent: 'neutral', cards: columns.sprint },
+    { id: 'backlog', title: 'Backlog', accent: 'muted', cards: columns.backlog },
     { id: 'plan', title: 'Plan', accent: columns.plan.length ? 'warning' : 'neutral', cards: columns.plan },
     { id: 'dev', title: 'Dev', accent: 'neutral', cards: columns.dev },
     {

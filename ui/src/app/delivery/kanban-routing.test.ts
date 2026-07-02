@@ -70,10 +70,57 @@ describe('buildKanbanColumns', () => {
     expect(githubColumns.find(column => column.id === 'code_mr')?.title).toBe('Code/PR')
   })
 
-  it('returns six columns in pipeline order even when empty', () => {
+  it('returns seven columns in pipeline order even when empty', () => {
     const columns = buildKanbanColumns(makeInbox(), [])
-    expect(columns.map(column => column.id)).toEqual(['sprint', 'plan', 'dev', 'code_mr', 'jira', 'done'])
+    expect(columns.map(column => column.id)).toEqual(['sprint', 'backlog', 'plan', 'dev', 'code_mr', 'jira', 'done'])
     expect(columns.every(column => column.cards.length === 0)).toBe(true)
+  })
+
+  it('routes non-selected and non-ready tickets to the backlog column', () => {
+    const inbox = makeInbox()
+    inbox.selectedSprint.tickets = [
+      {
+        readinessId: 'RD-1',
+        jiraKey: 'BN-1',
+        title: 'Selected',
+        estimatedDays: 1,
+        priorityRank: 0,
+        urgencyScore: 1,
+        warnings: [],
+        readinessStatus: 'ready',
+        sprintSelected: true
+      },
+      {
+        readinessId: 'RD-2',
+        jiraKey: 'BN-2',
+        title: 'Overflow',
+        estimatedDays: 3,
+        priorityRank: 1,
+        urgencyScore: 0,
+        warnings: ['Ready but over sprint capacity'],
+        readinessStatus: 'ready',
+        sprintSelected: false
+      },
+      {
+        readinessId: 'RD-3',
+        jiraKey: 'BN-3',
+        title: 'Clarify me',
+        estimatedDays: 1,
+        priorityRank: 2,
+        urgencyScore: 0,
+        warnings: ['Needs clarification before development'],
+        readinessStatus: 'needs_clarification',
+        sprintSelected: false
+      }
+    ]
+
+    const columns = buildKanbanColumns(inbox, [])
+    const byId = Object.fromEntries(columns.map(column => [column.id, column]))
+
+    expect(byId.sprint.cards.map(card => card.jiraKey)).toEqual(['BN-1'])
+    expect(byId.backlog.cards.map(card => card.jiraKey)).toEqual(['BN-2', 'BN-3'])
+    expect(byId.backlog.cards[0].ctaLabel).toBe('Approve dev')
+    expect(byId.backlog.cards[1].ctaLabel).toBe('Clarify')
   })
 
   it('places pending gates in their pipeline column with a CTA', () => {
@@ -304,7 +351,7 @@ describe('buildKanbanColumns', () => {
     expect(devCards.map(card => card.jiraKey)).toEqual(['TVP-2138'])
   })
 
-  it('shows needs_clarification sprint tickets with a Clarify CTA', () => {
+  it('shows needs_clarification tickets in the backlog with a Clarify CTA', () => {
     const inbox = makeInbox()
     inbox.selectedSprint.tickets = [
       {
@@ -320,14 +367,14 @@ describe('buildKanbanColumns', () => {
     ]
 
     const columns = buildKanbanColumns(inbox, [])
-    expect(columns.find(column => column.id === 'sprint')!.cards[0]).toMatchObject({
+    expect(columns.find(column => column.id === 'backlog')!.cards[0]).toMatchObject({
       jiraKey: 'TVP-2258',
       ctaLabel: 'Clarify',
       estimatedDays: 0.5
     })
   })
 
-  it('shows not_ready sprint tickets with a View blockers CTA', () => {
+  it('shows not_ready tickets in the backlog with a View blockers CTA', () => {
     const inbox = makeInbox()
     inbox.selectedSprint.tickets = [
       {
@@ -343,14 +390,14 @@ describe('buildKanbanColumns', () => {
     ]
 
     const columns = buildKanbanColumns(inbox, [])
-    expect(columns.find(column => column.id === 'sprint')!.cards[0]).toMatchObject({
+    expect(columns.find(column => column.id === 'backlog')!.cards[0]).toMatchObject({
       jiraKey: 'TVP-2260',
       ctaLabel: 'View blockers',
       estimatedDays: 0.5
     })
   })
 
-  it('shows analysis_failed sprint tickets without an approve CTA', () => {
+  it('shows analysis_failed tickets in the backlog without an approve CTA', () => {
     const inbox = makeInbox()
     inbox.selectedSprint.tickets = [
       {
@@ -366,7 +413,7 @@ describe('buildKanbanColumns', () => {
     ]
 
     const columns = buildKanbanColumns(inbox, [])
-    const card = columns.find(column => column.id === 'sprint')!.cards[0]
+    const card = columns.find(column => column.id === 'backlog')!.cards[0]
 
     expect(card.jiraKey).toBe('TVP-999')
     expect(card.ctaLabel).toBeUndefined()
