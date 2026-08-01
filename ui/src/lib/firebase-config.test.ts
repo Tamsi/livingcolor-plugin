@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/firebase-session', () => ({
   fetchFirebaseClientConfig: vi.fn(async () => ({ enabled: false, config: null }))
@@ -11,7 +11,12 @@ import {
 } from '@/lib/firebase-config'
 
 describe('resolveFirebaseWebConfig', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_LC_ENABLE_TEAM_AUTH', 'true')
+  })
+
   afterEach(() => {
+    vi.unstubAllEnvs()
     resetFirebaseWebConfigCache()
   })
 
