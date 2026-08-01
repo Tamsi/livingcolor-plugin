@@ -1,0 +1,33 @@
+[project]
+name = "livingcolor-plugin"
+version = "0.0.0"
+description = "LivingColor Hermes Agent plugin"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+  "fastapi>=0.115",
+  "httpx>=0.27",
+  "pydantic>=2.0",
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24",
+  "pyyaml>=6.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = [
+  "--ignore=tests/delivery_runtime/test_bn_shadow_evaluation.py",
+  "--ignore=tests/delivery_runtime/test_gate1_phase25_validation.py",
+  "--ignore=tests/delivery_runtime/test_live_evaluation.py",
+  "--ignore=tests/delivery_runtime/test_shadow_evaluation.py",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = []
