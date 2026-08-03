@@ -102,12 +102,23 @@ def _server_connected(name: str) -> bool:
 
 
 def connect_mcp_server(name: str, cfg: dict[str, Any]) -> dict[str, Any]:
+    import time
+
     from tools.mcp_tool import list_connected_mcp_tool_names, list_connected_mcp_raw_tool_names, reconnect_mcp_server
 
     raw_tool_names = list_connected_mcp_raw_tool_names(name)
     if not _server_connected(name) or not raw_tool_names:
         reconnect_mcp_server(name, cfg)
-    connected = _server_connected(name)
+        connect_errors = getattr(__import__("tools.mcp_tool", fromlist=["_server_connect_errors"]), "_server_connect_errors", {})
+        deadline = time.time() + 90.0
+        while time.time() < deadline:
+            raw_tool_names = list_connected_mcp_raw_tool_names(name)
+            if raw_tool_names:
+                break
+            if connect_errors.get(name):
+                break
+            time.sleep(1)
+    connected = _server_connected(name) and bool(list_connected_mcp_raw_tool_names(name))
     tool_count = len(list_connected_mcp_tool_names(name)) if connected else 0
     status = "connected" if connected else "disconnected"
     message = "Connected via MCP." if connected else f"Could not connect to MCP server '{name}'."
