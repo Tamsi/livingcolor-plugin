@@ -154,22 +154,6 @@ def main() -> int:
     log(f"Jira={jira_http} GitHub={gh_http} Stripe={stripe_http} livemode={stripe_live}")
     summary["phases"]["integrations"] = jira_http == 200 and gh_http == 200 and jcode == 200
 
-    log("Phase D0: Hermes MCP probe for Jira (in-process registry)")
-    probe_url = f"http://127.0.0.1:{PORT}/api/mcp/servers/jira/test"
-    probe_req = urllib.request.Request(
-        probe_url,
-        headers={"X-Hermes-Session-Token": TOKEN},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(probe_req, timeout=120) as resp:
-            probe_body = json.loads(resp.read().decode("utf-8"))
-            probe_code = resp.status
-    except urllib.error.HTTPError as exc:
-        probe_code = exc.code
-        probe_body = json.loads(exc.read().decode("utf-8", errors="replace") or "{}")
-    log(f"jira mcp probe HTTP {probe_code} ok={probe_body.get('ok')} tools={len(probe_body.get('tools') or [])}")
-
     log("Phase D: readiness scan")
     code, scan = request("POST", "/readiness/scan", {"projectKey": "TVP"})
     log(f"readiness scan HTTP {code}")
