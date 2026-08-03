@@ -139,6 +139,8 @@ def connect_jira_mcp() -> dict:
         name = JIRA_MCP_NAME
 
     raw_tool_names = list_connected_mcp_raw_tool_names(name)
+    tool_count = 0
+    invoke_ok = False
     needs_reconnect = not _jira_server_connected() or not raw_tool_names or not _mcp_server_has_live_session(name)
     if needs_reconnect:
         reconnect_mcp_server(name, cfg)
@@ -149,12 +151,15 @@ def connect_jira_mcp() -> dict:
         tool_count = len(raw_tool_names)
         _reset_mcp_circuit_breaker(name)
 
-    if tool_count > 0 and not _probe_jira_mcp_invoke(name):
+    invoke_ok = tool_count > 0 and _probe_jira_mcp_invoke(name)
+    if tool_count > 0 and not invoke_ok:
         reconnect_mcp_server(name, cfg)
         tool_count = _wait_for_mcp_tools(name)
         if tool_count > 0:
             _reset_mcp_circuit_breaker(name)
-    connected = _jira_server_connected() and tool_count > 0
+        invoke_ok = tool_count > 0 and _probe_jira_mcp_invoke(name)
+
+    connected = _jira_server_connected() and tool_count > 0 and invoke_ok
     oauth_ready = _oauth_tokens_present(name) if cfg.get("auth") == "oauth" else True
     if connected and tool_count == 0:
         tool_count = len(list_connected_mcp_tool_names(name))
@@ -164,10 +169,13 @@ def connect_jira_mcp() -> dict:
     status = "connected" if connected and oauth_ready else "disconnected"
     message = "Connected to Jira via MCP."
     if not connected:
-        message = (
-            "Could not connect to Jira. Complete the browser OAuth flow if prompted, "
-            "then try again."
-        )
+        if tool_count > 0 and not invoke_ok:
+            message = "Jira MCP tools are registered but search probe failed. Retry connect."
+        else:
+            message = (
+                "Could not connect to Jira. Complete the browser OAuth flow if prompted, "
+                "then try again."
+            )
     elif cfg.get("auth") == "oauth" and not oauth_ready:
         message = "Jira MCP connected, but OAuth tokens were not saved. Retry the login flow."
         status = "disconnected"
