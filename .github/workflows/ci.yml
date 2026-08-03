@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.22'
           cache: npm
           cache-dependency-path: ui/package-lock.json
 
@@ -49,6 +49,11 @@ jobs:
 
       - name: Install test dependencies
         run: pip install -e ".[test]"
+
+      - name: Configure git for repository tests
+        run: |
+          git config --global user.email "ci@localhost"
+          git config --global user.name "CI"
 
       - name: Hermes-free unit tests
         run: ./scripts/run-ci-tests.sh -q
