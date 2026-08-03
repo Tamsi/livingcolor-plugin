@@ -66,6 +66,13 @@ def _jira_server_connected() -> bool:
     return False
 
 
+def _reset_mcp_circuit_breaker(server_name: str) -> None:
+    """Clear Hermes MCP circuit-breaker state after a successful reconnect."""
+    reset = getattr(__import__("tools.mcp_tool", fromlist=["_reset_server_error"]), "_reset_server_error", None)
+    if callable(reset):
+        reset(server_name)
+
+
 def _wait_for_mcp_tools(server_name: str, *, timeout_s: float = 90.0) -> int:
     """Poll until MCP tools are registered or connect fails/times out."""
     import time
@@ -103,6 +110,8 @@ def connect_jira_mcp() -> dict:
     if not _jira_server_connected() or not raw_tool_names:
         reconnect_mcp_server(name, cfg)
         tool_count = _wait_for_mcp_tools(name)
+        if tool_count > 0:
+            _reset_mcp_circuit_breaker(name)
     else:
         tool_count = len(raw_tool_names)
     connected = _jira_server_connected() and tool_count > 0

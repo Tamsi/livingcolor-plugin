@@ -213,23 +213,33 @@ verify_mount() {
 }
 
 warmup_jira_mcp() {
-  log "Warming up Jira MCP connection (mcp-atlassian via uvx)..."
-  if ! python3 - <<'PY'
-import json
-import sys
-from jira_dashboard.mcp_compat import install_mcp_tool_shims
-install_mcp_tool_shims()
-from jira_dashboard.service import connect_jira_mcp
-result = connect_jira_mcp()
-if not result.get("ok"):
-    print(result.get("message") or "Jira MCP warmup failed", file=sys.stderr)
-    sys.exit(1)
-print(f"toolCount={result.get('toolCount', 0)}")
-PY
-  then
-    log "WARNING: Jira MCP warmup failed in bootstrap shell; Hermes process may need dashboard restart"
+  log "Warming up Jira MCP inside Hermes dashboard (mcp-atlassian via uvx)..."
+  local token="${HERMES_DASHBOARD_SESSION_TOKEN:-cloud-agent-session-token}"
+  local base="http://127.0.0.1:${HERMES_PORT}"
+  local test_code
+  test_code=$(curl -sS -o /tmp/lc-jira-mcp-test.json -w '%{http_code}' \
+    -X POST \
+    -H "X-Hermes-Session-Token: ${token}" \
+    "${base}/api/mcp/servers/jira/test" || echo "000")
+  if [ "${test_code}" != "200" ]; then
+    log "WARNING: Jira MCP probe HTTP ${test_code}"
     return 1
   fi
+  if ! python3 -c "import json; d=json.load(open('/tmp/lc-jira-mcp-test.json')); raise SystemExit(0 if d.get('ok') else 1)" 2>/dev/null; then
+    log "WARNING: Jira MCP probe returned ok=false"
+    return 1
+  fi
+  local connect_code
+  connect_code=$(curl -sS -o /tmp/lc-jira-connect.json -w '%{http_code}' \
+    -X POST \
+    -H "X-Hermes-Session-Token: ${token}" \
+    -H "X-LC-Project-Key: TVP" \
+    "${base}/api/plugins/livingcolor/jira/connect" || echo "000")
+  if [ "${connect_code}" != "200" ]; then
+    log "WARNING: LivingColor Jira connect HTTP ${connect_code}"
+    return 1
+  fi
+  python3 -c "import json; d=json.load(open('/tmp/lc-jira-connect.json')); print(f'toolCount={d.get(\"toolCount\", 0)}')"
 }
 
 restart_dashboard() {
