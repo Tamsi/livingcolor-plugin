@@ -16,6 +16,7 @@ On the agent-lc fork the symbols already exist and nothing is patched.
 """
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 from typing import Any, List, Optional
@@ -42,6 +43,19 @@ def install_mcp_tool_shims() -> None:
     import tools.mcp_tool as mcp
 
     missing = [name for name in _SHIM_SYMBOLS if not hasattr(mcp, name)]
+
+    # Hermes >=0.19 ships reconnect_mcp_server(server_name) only (no config arg).
+    # LivingColor still needs the fork 2-arg form to (re)register from saved config.
+    force_reconnect = False
+    if hasattr(mcp, "reconnect_mcp_server"):
+        try:
+            params = list(inspect.signature(mcp.reconnect_mcp_server).parameters)
+            force_reconnect = len(params) < 2
+        except (TypeError, ValueError):
+            force_reconnect = True
+    if force_reconnect and "reconnect_mcp_server" not in missing:
+        missing.append("reconnect_mcp_server")
+
     if not missing:
         _installed = True
         return
