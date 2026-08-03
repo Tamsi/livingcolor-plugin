@@ -69,7 +69,7 @@ def _jira_server_connected() -> bool:
 def connect_jira_mcp() -> dict:
     """Connect the configured Jira MCP server via the MCP runtime."""
     from lc_server.integrations.mcp_server_resolver import resolve_jira_mcp_server_name
-    from tools.mcp_tool import list_connected_mcp_tool_names, reconnect_mcp_server
+    from tools.mcp_tool import list_connected_mcp_tool_names, list_connected_mcp_raw_tool_names, reconnect_mcp_server
 
     resolved = resolve_jira_mcp_server_name()
     if resolved:
