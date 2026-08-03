@@ -118,6 +118,8 @@ def connect_jira_mcp() -> dict:
     oauth_ready = _oauth_tokens_present(name) if cfg.get("auth") == "oauth" else True
     if connected and tool_count == 0:
         tool_count = len(list_connected_mcp_tool_names(name))
+    if connected and tool_count > 0:
+        _reset_mcp_circuit_breaker(name)
 
     status = "connected" if connected and oauth_ready else "disconnected"
     message = "Connected to Jira via MCP."
