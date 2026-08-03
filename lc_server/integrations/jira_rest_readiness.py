@@ -79,7 +79,7 @@ def fetch_issues_for_readiness_via_rest(
     """Fetch Jira issues through REST when MCP is blocked or unreachable."""
     last_error: Exception | None = None
     for jql in jql_variants:
-        for path in ("/rest/api/3/search", "/rest/api/3/search/jql"):
+        for path in ("/rest/api/3/search/jql",):
             try:
                 payload = _jira_rest_request(
                     "POST",
