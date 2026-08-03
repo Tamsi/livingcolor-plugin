@@ -27,10 +27,14 @@ require_cmd() {
 install_hermes() {
   if command -v hermes >/dev/null 2>&1; then
     log "Hermes already installed: $(hermes --version 2>/dev/null | head -1)"
-    return 0
+  else
+    log "Installing hermes-agent..."
+    pip install --user hermes-agent mcp
   fi
-  log "Installing hermes-agent..."
-  pip install --user hermes-agent mcp
+  if ! python3 -c "import mcp" 2>/dev/null; then
+    log "Installing mcp Python package (required for Hermes MCP stdio servers)..."
+    pip install --user mcp
+  fi
 }
 
 install_uvx() {

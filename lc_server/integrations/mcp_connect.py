@@ -102,9 +102,11 @@ def _server_connected(name: str) -> bool:
 
 
 def connect_mcp_server(name: str, cfg: dict[str, Any]) -> dict[str, Any]:
-    from tools.mcp_tool import list_connected_mcp_tool_names, reconnect_mcp_server
+    from tools.mcp_tool import list_connected_mcp_tool_names, list_connected_mcp_raw_tool_names, reconnect_mcp_server
 
-    reconnect_mcp_server(name, cfg)
+    raw_tool_names = list_connected_mcp_raw_tool_names(name)
+    if not _server_connected(name) or not raw_tool_names:
+        reconnect_mcp_server(name, cfg)
     connected = _server_connected(name)
     tool_count = len(list_connected_mcp_tool_names(name)) if connected else 0
     status = "connected" if connected else "disconnected"

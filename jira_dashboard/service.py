@@ -79,7 +79,9 @@ def connect_jira_mcp() -> dict:
         cfg = ensure_jira_mcp_config()
         name = JIRA_MCP_NAME
 
-    reconnect_mcp_server(name, cfg)
+    raw_tool_names = list_connected_mcp_raw_tool_names(name)
+    if not _jira_server_connected() or not raw_tool_names:
+        reconnect_mcp_server(name, cfg)
     connected = _jira_server_connected()
     oauth_ready = _oauth_tokens_present(name) if cfg.get("auth") == "oauth" else True
     tool_count = 0
