@@ -58,50 +58,68 @@ def fetch_issues_for_readiness(project_key: str, *, max_results: int = 200) -> l
     livingcolor_project_key = str(project_key or "").strip().upper()
     jira_project_key = resolve_jira_project_key(livingcolor_project_key)
     ticket_scope = load_ticket_scope_for_project(livingcolor_project_key)
-    from lc_server.integrations.mcp_server_resolver import active_jira_mcp_name
-    from hermes_cli.jira_dashboard import (
-        JiraDashboardError,
-        _ensure_cloud_id,
-        _fetch_projects,
-        _issue_field,
-        _issue_jql_variants,
-        _normalize_issue,
-        _resolve_project_key,
-        _search_issues_with_fallbacks,
-        ensure_jira_mcp_connected,
-    )
-    from hermes_cli.mcp_config import _get_mcp_servers
-    from tools.mcp_tool import invoke_mcp_tool, list_connected_mcp_raw_tool_names
+    jql_variants = build_ticket_scope_jql_variants(jira_project_key, ticket_scope)
+    raw_issues: list[dict[str, Any]] = []
+    mcp_error: Exception | None = None
 
     try:
+        from lc_server.integrations.mcp_server_resolver import active_jira_mcp_name
+        from hermes_cli.jira_dashboard import (
+            JiraDashboardError,
+            _ensure_cloud_id,
+            _fetch_projects,
+            _normalize_issue,
+            _resolve_project_key,
+            _search_issues_with_fallbacks,
+            ensure_jira_mcp_connected,
+        )
+        from hermes_cli.mcp_config import _get_mcp_servers
+        from tools.mcp_tool import invoke_mcp_tool, list_connected_mcp_raw_tool_names
+
         ensure_jira_mcp_connected()
-    except JiraDashboardError as exc:
-        raise ReadinessIntegrationError(str(exc)) from exc
+        jira_name = active_jira_mcp_name()
+        cfg = _get_mcp_servers().get(jira_name)
+        tool_names = list_connected_mcp_raw_tool_names(jira_name)
 
-    jira_name = active_jira_mcp_name()
-    cfg = _get_mcp_servers().get(jira_name)
-    tool_names = list_connected_mcp_raw_tool_names(jira_name)
+        def invoke(tool_name: str, arguments: dict) -> dict:
+            return invoke_mcp_tool(jira_name, tool_name, arguments)
 
-    def invoke(tool_name: str, arguments: dict) -> dict:
-        return invoke_mcp_tool(jira_name, tool_name, arguments)
-
-    try:
         projects = _fetch_projects(tool_names, invoke)
         selected_project = _resolve_project_key(projects, jira_project_key)
         if not selected_project:
             raise ReadinessIntegrationError(f"Unknown Jira project key: {jira_project_key}")
 
         cloud_id = _ensure_cloud_id(cfg, tool_names, invoke)
-        jql_variants = build_ticket_scope_jql_variants(selected_project, ticket_scope)
+        scoped_jql = build_ticket_scope_jql_variants(selected_project, ticket_scope)
         raw_issues = _search_issues_with_fallbacks(
             tool_names,
             invoke,
             cloud_id=cloud_id,
-            jql_variants=jql_variants,
+            jql_variants=scoped_jql,
             max_results=max_results,
         )
-    except JiraDashboardError as exc:
-        raise ReadinessIntegrationError(str(exc)) from exc
+    except (JiraDashboardError, ReadinessIntegrationError) as exc:
+        mcp_error = exc
+        logger.warning("Jira MCP readiness fetch failed; trying REST fallback: %s", exc)
+    except Exception as exc:
+        mcp_error = exc
+        logger.warning("Jira MCP readiness fetch failed unexpectedly; trying REST fallback: %s", exc)
+
+    if not raw_issues:
+        try:
+            from lc_server.integrations.jira_rest_readiness import fetch_issues_for_readiness_via_rest
+
+            raw_issues = fetch_issues_for_readiness_via_rest(
+                jira_project_key,
+                jql_variants=jql_variants,
+                max_results=max_results,
+            )
+        except Exception as rest_exc:
+            if mcp_error is not None:
+                raise ReadinessIntegrationError(str(mcp_error)) from rest_exc
+            raise ReadinessIntegrationError(str(rest_exc)) from rest_exc
+
+    from hermes_cli.jira_dashboard import _normalize_issue
 
     snapshots: list[dict[str, Any]] = []
     for raw in raw_issues:
