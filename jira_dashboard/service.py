@@ -66,6 +66,38 @@ def _jira_server_connected() -> bool:
     return False
 
 
+def _mcp_server_has_live_session(server_name: str) -> bool:
+    from tools.mcp_tool import _lock, _servers
+
+    with _lock:
+        server = _servers.get(server_name)
+        return bool(server and getattr(server, "session", None))
+
+
+def _probe_jira_mcp_invoke(server_name: str) -> bool:
+    """Return True when a lightweight Jira search succeeds on the live MCP session."""
+    from tools.mcp_tool import invoke_mcp_tool, list_connected_mcp_raw_tool_names
+
+    tool_names = list_connected_mcp_raw_tool_names(server_name)
+    search_tool = next((name for name in tool_names if name.lower() == "jira_search"), None)
+    if not search_tool:
+        return False
+    try:
+        payload = invoke_mcp_tool(
+            server_name,
+            search_tool,
+            {"jql": "project = TVP ORDER BY updated DESC", "limit": 1},
+            timeout=30.0,
+        )
+    except Exception:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    if payload.get("error"):
+        return False
+    return True
+
+
 def _reset_mcp_circuit_breaker(server_name: str) -> None:
     """Clear Hermes MCP circuit-breaker state after a successful reconnect."""
     reset = getattr(__import__("tools.mcp_tool", fromlist=["_reset_server_error"]), "_reset_server_error", None)
@@ -107,13 +139,21 @@ def connect_jira_mcp() -> dict:
         name = JIRA_MCP_NAME
 
     raw_tool_names = list_connected_mcp_raw_tool_names(name)
-    if not _jira_server_connected() or not raw_tool_names:
+    needs_reconnect = not _jira_server_connected() or not raw_tool_names or not _mcp_server_has_live_session(name)
+    if needs_reconnect:
         reconnect_mcp_server(name, cfg)
         tool_count = _wait_for_mcp_tools(name)
         if tool_count > 0:
             _reset_mcp_circuit_breaker(name)
     else:
         tool_count = len(raw_tool_names)
+        _reset_mcp_circuit_breaker(name)
+
+    if tool_count > 0 and not _probe_jira_mcp_invoke(name):
+        reconnect_mcp_server(name, cfg)
+        tool_count = _wait_for_mcp_tools(name)
+        if tool_count > 0:
+            _reset_mcp_circuit_breaker(name)
     connected = _jira_server_connected() and tool_count > 0
     oauth_ready = _oauth_tokens_present(name) if cfg.get("auth") == "oauth" else True
     if connected and tool_count == 0:
