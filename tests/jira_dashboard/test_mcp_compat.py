@@ -6,7 +6,6 @@ import inspect
 
 
 def test_reconnect_mcp_server_shim_accepts_config(monkeypatch):
-    """Hermes 0.19+ upstream reconnect is 1-arg; plugin shim must accept config."""
     import tools.mcp_tool as mcp
 
     monkeypatch.setattr(mcp, "reconnect_mcp_server", lambda server_name: True, raising=False)
@@ -39,3 +38,15 @@ def test_reconnect_mcp_server_shim_accepts_config(monkeypatch):
 
     assert calls == [("jira", None)]
     assert registered == [{"jira": cfg}]
+
+
+def test_call_tool_result_iserror_compat_patch():
+    from jira_dashboard.mcp_compat import install_mcp_tool_shims
+
+    install_mcp_tool_shims()
+    from mcp.types import CallToolResult, TextContent
+
+    ok = CallToolResult(content=[TextContent(type="text", text="ok")], is_error=False)
+    err = CallToolResult(content=[TextContent(type="text", text="bad")], is_error=True)
+    assert ok.isError is False
+    assert err.isError is True

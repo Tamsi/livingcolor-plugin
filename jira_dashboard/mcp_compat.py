@@ -37,11 +37,28 @@ _FORCE_OVERRIDE_SYMBOLS = frozenset({"reconnect_mcp_server"})
 _installed = False
 
 
+def _patch_mcp_call_tool_result_compat() -> None:
+    """Hermes 0.19 reads CallToolResult.isError; MCP 2.0 exposes is_error only."""
+    try:
+        from mcp.types import CallToolResult
+
+        if getattr(CallToolResult, "isError", None) is None or not isinstance(
+            getattr(CallToolResult, "isError", None), property
+        ):
+            CallToolResult.isError = property(  # type: ignore[attr-defined]
+                lambda self: bool(getattr(self, "is_error", False))
+            )
+    except Exception as exc:
+        logger.debug("CallToolResult compat patch skipped: %s", exc)
+
+
 def install_mcp_tool_shims() -> None:
     """Add missing fork helpers to ``tools.mcp_tool`` (idempotent)."""
     global _installed
     if _installed:
         return
+
+    _patch_mcp_call_tool_result_compat()
 
     import tools.mcp_tool as mcp
 
