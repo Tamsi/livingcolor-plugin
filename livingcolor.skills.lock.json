@@ -1,7 +1,7 @@
 {
   "repo": "Tamsi/livingcolor-skills",
-  "ref": "v0.2.0",
-  "resolvedCommit": "316e3ba0f98aacff910c3f79e64f21e058d11baa",
+  "ref": "v0.2.1",
+  "resolvedCommit": "19af2c40f8ee0505dc550001679ed88424545f18",
   "bundle": "code-review-pipeline",
   "skills": [
     "ticket-analyst",
