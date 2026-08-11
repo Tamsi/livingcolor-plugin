@@ -30,6 +30,10 @@ _SHIM_SYMBOLS = (
     "reconnect_mcp_server",
 )
 
+# Upstream Hermes 0.19+ ships reconnect_mcp_server(server_name) only; the plugin
+# needs the fork's reconnect_mcp_server(server_name, config) to (re)register stdio MCP.
+_FORCE_OVERRIDE_SYMBOLS = frozenset({"reconnect_mcp_server"})
+
 _installed = False
 
 
@@ -41,7 +45,11 @@ def install_mcp_tool_shims() -> None:
 
     import tools.mcp_tool as mcp
 
-    missing = [name for name in _SHIM_SYMBOLS if not hasattr(mcp, name)]
+    missing = [
+        name
+        for name in _SHIM_SYMBOLS
+        if not hasattr(mcp, name) or name in _FORCE_OVERRIDE_SYMBOLS
+    ]
     if not missing:
         _installed = True
         return
@@ -154,10 +162,17 @@ def install_mcp_tool_shims() -> None:
             except BaseException as exc:
                 logger.debug("Error during MCP shutdown for '%s': %s", server_name, exc)
 
-    def reconnect_mcp_server(server_name: str, config: dict) -> List[str]:
-        """Restart one MCP server from fresh config."""
+    _upstream_reconnect = getattr(mcp, "reconnect_mcp_server", None)
+
+    def reconnect_mcp_server(server_name: str, config: dict | None = None) -> List[str] | bool:
+        """Restart one MCP server from fresh config (fork API) or signal reconnect (upstream)."""
+        if config is not None:
+            shutdown_mcp_server(server_name)
+            return mcp.register_mcp_servers({server_name: config})
+        if callable(_upstream_reconnect) and _upstream_reconnect is not reconnect_mcp_server:
+            return _upstream_reconnect(server_name)
         shutdown_mcp_server(server_name)
-        return mcp.register_mcp_servers({server_name: config})
+        return []
 
     shims = {
         "list_connected_mcp_tool_names": list_connected_mcp_tool_names,
@@ -166,7 +181,8 @@ def install_mcp_tool_shims() -> None:
         "shutdown_mcp_server": shutdown_mcp_server,
         "reconnect_mcp_server": reconnect_mcp_server,
     }
-    for name in missing:
+    installed_names = [name for name in missing if name in shims]
+    for name in installed_names:
         setattr(mcp, name, shims[name])
-    logger.info("Installed tools.mcp_tool compat shims: %s", ", ".join(missing))
+    logger.info("Installed tools.mcp_tool compat shims: %s", ", ".join(installed_names))
     _installed = True
