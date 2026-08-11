@@ -8,7 +8,7 @@ FastAPI service for **Team** mode (`livingcolor-app` Firebase project). Producti
 export FIREBASE_PROJECT_ID=livingcolor-app
 export FIREBASE_CLIENT_EMAIL=...
 export FIREBASE_PRIVATE_KEY=...
-# or: export FIREBASE_SERVICE_ACCOUNT_PATH=~/.livingcolor/firebase-service-account.json
+# or: export FIREBASE_SERVICE_ACCOUNT_PATH=~/.hermes/livingcolor/firebase-service-account.json
 
 uvicorn cloud_api.main:app --reload --port 8080
 curl http://127.0.0.1:8080/v1/health
