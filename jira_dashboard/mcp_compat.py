@@ -43,20 +43,21 @@ def install_mcp_tool_shims() -> None:
     import tools.mcp_tool as mcp
 
     missing = [name for name in _SHIM_SYMBOLS if not hasattr(mcp, name)]
+    native_reconnect = getattr(mcp, "reconnect_mcp_server", None)
 
     # Hermes >=0.19 ships reconnect_mcp_server(server_name) only (no config arg).
     # LivingColor still needs the fork 2-arg form to (re)register from saved config.
-    force_reconnect = False
-    if hasattr(mcp, "reconnect_mcp_server"):
+    force_reconnect_override = False
+    if native_reconnect is not None:
         try:
-            params = list(inspect.signature(mcp.reconnect_mcp_server).parameters)
-            force_reconnect = len(params) < 2
+            params = list(inspect.signature(native_reconnect).parameters)
+            force_reconnect_override = len(params) < 2
         except (TypeError, ValueError):
-            force_reconnect = True
-    if force_reconnect and "reconnect_mcp_server" not in missing:
+            force_reconnect_override = True
+    if force_reconnect_override and "reconnect_mcp_server" not in missing:
         missing.append("reconnect_mcp_server")
 
-    if not missing:
+    if not missing and not force_reconnect_override:
         _installed = True
         return
 
@@ -168,10 +169,20 @@ def install_mcp_tool_shims() -> None:
             except BaseException as exc:
                 logger.debug("Error during MCP shutdown for '%s': %s", server_name, exc)
 
-    def reconnect_mcp_server(server_name: str, config: dict) -> List[str]:
-        """Restart one MCP server from fresh config."""
+    def reconnect_mcp_server(server_name: str, config: Optional[dict] = None) -> Any:
+        """Restart one MCP server from fresh config, or signal upstream reconnect.
+
+        Hermes 0.19+ exposes ``reconnect_mcp_server(server_name)`` only. The
+        LivingColor fork used ``(server_name, config)`` to cold-restart from MCP
+        config — keep both shapes for cloud bootstrap and Jira connect flows.
+        """
+        if config is not None:
+            shutdown_mcp_server(server_name)
+            return mcp.register_mcp_servers({server_name: config})
+        if native_reconnect is not None:
+            return native_reconnect(server_name)
         shutdown_mcp_server(server_name)
-        return mcp.register_mcp_servers({server_name: config})
+        return []
 
     shims = {
         "list_connected_mcp_tool_names": list_connected_mcp_tool_names,
@@ -180,7 +191,15 @@ def install_mcp_tool_shims() -> None:
         "shutdown_mcp_server": shutdown_mcp_server,
         "reconnect_mcp_server": reconnect_mcp_server,
     }
+    patched: List[str] = []
     for name in missing:
         setattr(mcp, name, shims[name])
-    logger.info("Installed tools.mcp_tool compat shims: %s", ", ".join(missing))
+        patched.append(name)
+    # Upstream Hermes may define reconnect_mcp_server with a 1-arg signature; always
+    # replace it so connect_jira_mcp / readiness scan can pass MCP config.
+    if force_reconnect_override and "reconnect_mcp_server" not in patched:
+        setattr(mcp, "reconnect_mcp_server", reconnect_mcp_server)
+        patched.append("reconnect_mcp_server (compat override)")
+    if patched:
+        logger.info("Installed tools.mcp_tool compat shims: %s", ", ".join(patched))
     _installed = True
