@@ -13,15 +13,15 @@ export default defineConfig({
     'process.env.NODE_ENV': JSON.stringify('production'),
   },
   resolve: {
-    alias: { '@': path.resolve(__dirname, 'src') },
+    alias: { '@': path.resolve(import.meta.dirname, 'src') },
   },
   build: {
     // Inline brand PNGs into index.js (served via dashboard-plugins script URL).
     assetsInlineLimit: 100_000,
-    outDir: path.resolve(__dirname, '../dashboard/dist'),
+    outDir: path.resolve(import.meta.dirname, '../dashboard/dist'),
     emptyOutDir: true,
     lib: {
-      entry: path.resolve(__dirname, 'src/main.tsx'),
+      entry: path.resolve(import.meta.dirname, 'src/main.tsx'),
       name: 'LivingColorPlugin',
       formats: ['iife'],
       fileName: () => 'index.js',
