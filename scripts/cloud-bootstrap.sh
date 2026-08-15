@@ -35,6 +35,11 @@ install_hermes() {
     log "Installing mcp Python package (required for Hermes MCP stdio servers)..."
     pip install --user mcp
   fi
+<<<<<<< HEAD
+=======
+  log "Installing hermes-agent..."
+  pip install --user 'hermes-agent[mcp]' mcp
+>>>>>>> 4ff3c9b (fix: install hermes-agent[mcp] in cloud bootstrap for MCP SDK)
 }
 
 install_uvx() {
