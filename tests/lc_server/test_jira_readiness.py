@@ -78,11 +78,45 @@ def test_fetch_issues_for_readiness_surfaces_reconnect_errors(monkeypatch):
         "hermes_cli.jira_dashboard.ensure_jira_mcp_connected",
         lambda: (_ for _ in ()).throw(JiraDashboardError("Could not connect to Jira.")),
     )
+    monkeypatch.setattr(
+        "lc_server.integrations.jira_rest_readiness.fetch_issues_for_readiness_via_rest",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("Jira REST credentials are not configured")),
+    )
 
     from lc_server.integrations.jira_readiness import fetch_issues_for_readiness
 
     with pytest.raises(ReadinessIntegrationError, match="Could not connect to Jira"):
         fetch_issues_for_readiness("BN")
+
+
+def test_fetch_issues_for_readiness_uses_rest_when_mcp_fails(monkeypatch):
+    from hermes_cli.jira_dashboard import JiraDashboardError
+
+    monkeypatch.setattr(
+        "hermes_cli.jira_dashboard.ensure_jira_mcp_connected",
+        lambda: (_ for _ in ()).throw(JiraDashboardError("Could not connect to Jira.")),
+    )
+    monkeypatch.setattr(
+        "delivery_runtime.readiness.ticket_scope.load_ticket_scope_for_project",
+        lambda _project: TicketScopeConfig(status_groups=("todo",)),
+    )
+    monkeypatch.setattr(
+        "lc_server.integrations.jira_rest_readiness.fetch_issues_for_readiness_via_rest",
+        lambda project_key, **_kwargs: [{"key": "BN-9", "fields": {"summary": "Via REST"}}],
+    )
+    monkeypatch.setattr(
+        "hermes_cli.jira_dashboard._normalize_issue",
+        lambda raw: {"key": raw["key"], "summary": "Via REST"},
+    )
+    monkeypatch.setattr(
+        "lc_server.integrations.jira_readiness.enrich_issue_snapshot",
+        lambda raw, normalized, project_key: {**normalized, "projectKey": project_key},
+    )
+
+    from lc_server.integrations.jira_readiness import fetch_issues_for_readiness
+
+    issues = fetch_issues_for_readiness("BN")
+    assert issues == [{"key": "BN-9", "summary": "Via REST", "projectKey": "BN"}]
 
 
 def test_extract_issue_comments_normalizes_adf_and_plain_text():
