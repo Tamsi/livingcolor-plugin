@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Callable
 
@@ -87,6 +88,8 @@ class McpJiraEstimateInvoker:
             raise RuntimeError("Connected Jira MCP server does not expose an issue update tool")
 
         timetracking_fields = {"timetracking": {"originalEstimate": estimate}}
+        fields_json = json.dumps(timetracking_fields)
+        original_estimate_json = json.dumps({"originalEstimate": estimate})
         snake_case_tool = tool in {
             "update_issue",
             "jira_update_issue",
@@ -94,7 +97,10 @@ class McpJiraEstimateInvoker:
             "jira_edit_issue",
         } or tool.endswith("_update_issue") or tool.endswith("_edit_issue")
         if snake_case_tool:
+            # mcp-atlassian validates `fields` as a JSON string, not a dict.
             arg_variants = [
+                {"issue_key": issue_key, "fields": fields_json},
+                {"issue_key": issue_key, "fields": original_estimate_json},
                 {"issue_key": issue_key, "fields": timetracking_fields},
                 {"issue_key": issue_key, "originalEstimate": estimate},
                 {"issue_key": issue_key, "fields": {"originalEstimate": estimate}},
