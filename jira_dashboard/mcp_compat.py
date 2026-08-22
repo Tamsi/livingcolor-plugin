@@ -16,6 +16,7 @@ On the agent-lc fork the symbols already exist and nothing is patched.
 """
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 from typing import Any, List, Optional
@@ -33,15 +34,45 @@ _SHIM_SYMBOLS = (
 _installed = False
 
 
+def _patch_mcp_call_tool_result_compat() -> None:
+    """Hermes 0.19 reads CallToolResult.isError; MCP 2.0 exposes is_error only."""
+    try:
+        from mcp.types import CallToolResult
+
+        if getattr(CallToolResult, "isError", None) is None or not isinstance(
+            getattr(CallToolResult, "isError", None), property
+        ):
+            CallToolResult.isError = property(  # type: ignore[attr-defined]
+                lambda self: bool(getattr(self, "is_error", False))
+            )
+    except Exception as exc:
+        logger.debug("CallToolResult compat patch skipped: %s", exc)
+
+
+def _needs_reconnect_override(native_reconnect: Any) -> bool:
+    """Hermes 0.19+ ships reconnect_mcp_server(server_name) only."""
+    if native_reconnect is None:
+        return False
+    try:
+        return len(list(inspect.signature(native_reconnect).parameters)) < 2
+    except (TypeError, ValueError):
+        return True
+
+
 def install_mcp_tool_shims() -> None:
     """Add missing fork helpers to ``tools.mcp_tool`` (idempotent)."""
     global _installed
     if _installed:
         return
 
+    _patch_mcp_call_tool_result_compat()
+
     import tools.mcp_tool as mcp
 
     missing = [name for name in _SHIM_SYMBOLS if not hasattr(mcp, name)]
+    native_reconnect = getattr(mcp, "reconnect_mcp_server", None)
+    if _needs_reconnect_override(native_reconnect) and "reconnect_mcp_server" not in missing:
+        missing.append("reconnect_mcp_server")
     if not missing:
         _installed = True
         return
@@ -154,10 +185,20 @@ def install_mcp_tool_shims() -> None:
             except BaseException as exc:
                 logger.debug("Error during MCP shutdown for '%s': %s", server_name, exc)
 
-    def reconnect_mcp_server(server_name: str, config: dict) -> List[str]:
-        """Restart one MCP server from fresh config."""
+    def reconnect_mcp_server(server_name: str, config: Optional[dict] = None) -> Any:
+        """Restart one MCP server from fresh config, or signal upstream reconnect.
+
+        Hermes 0.19+ exposes ``reconnect_mcp_server(server_name)`` only. The
+        plugin still needs the fork two-arg form to shutdown and
+        ``register_mcp_servers`` for stdio servers such as ``uvx mcp-atlassian``.
+        """
+        if config is not None:
+            shutdown_mcp_server(server_name)
+            return mcp.register_mcp_servers({server_name: config})
+        if callable(native_reconnect) and native_reconnect is not reconnect_mcp_server:
+            return native_reconnect(server_name)
         shutdown_mcp_server(server_name)
-        return mcp.register_mcp_servers({server_name: config})
+        return []
 
     shims = {
         "list_connected_mcp_tool_names": list_connected_mcp_tool_names,
