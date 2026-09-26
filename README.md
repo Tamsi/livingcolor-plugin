@@ -384,6 +384,8 @@ When the plugin is enabled, Hermes exposes:
 
 **Model toolset `livingcolor`**
 
+Delivery tools:
+
 | Tool | Description |
 | --- | --- |
 | `delivery_overview` | Snapshot of work orders, readiness queue, pending gates |
@@ -391,6 +393,17 @@ When the plugin is enabled, Hermes exposes:
 | `delivery_promote` | Promote a readiness record to a Work Order |
 | `delivery_gate_decision` | Approve or reject a paused gate |
 | `delivery_work_order_status` | Fetch a Work Order's stage and metadata |
+
+PM / Mission Control tools (same toolset; used by project chat and the
+`livingcolor-pm` skill):
+
+| Tool | Description |
+| --- | --- |
+| `livingcolor_get_delivery_context` | Active project sprint, queue, clarifications, and last analysis |
+| `livingcolor_update_ticket_estimation` | Update effort estimate for a ready ticket |
+| `livingcolor_update_sprint_selection` | Replace, remove, swap, or append sprint tickets |
+| `livingcolor_promote_ticket` | Approve a ready ticket for autonomous development |
+| `livingcolor_run_daily_analysis` | Run daily scan, qualification, estimation, and sprint rebuild |
 
 Enable the toolset in your Hermes platform or session tool configuration
 alongside your usual toolsets.
@@ -407,10 +420,14 @@ alongside your usual toolsets.
 
 ```bash
 uv venv .venv && source .venv/bin/activate
-uv pip install -e /path/to/hermes-agent pytest httpx
-pytest tests -x -q
-cd ui && npm install && npx vite build   # rebuilds dashboard/dist — commit dist/ after UI changes
+uv pip install -e ".[test]"
+./scripts/check-versions.sh
+./scripts/run-ci-tests.sh -q
+cd ui && npm install && npm test && npx vite build   # rebuilds dashboard/dist — commit dist/ after UI changes
 ```
+
+Keep `plugin.yaml`, `dashboard/manifest.json`, `pyproject.toml`, and
+`ui/package.json` on the same version string.
 
 Point Hermes at a local clone:
 
@@ -419,6 +436,10 @@ git clone https://github.com/abecms/livingcolor-plugin.git ~/.hermes/plugins/liv
 hermes plugins enable livingcolor
 hermes gateway restart
 ```
+
+## License
+
+LivingColor plugin code is released under the [MIT License](LICENSE).
 
 ## Provenance
 

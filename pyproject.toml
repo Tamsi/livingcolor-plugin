@@ -1,6 +1,6 @@
 [project]
 name = "livingcolor-plugin"
-version = "0.0.0"
+version = "0.3.24"
 description = "LivingColor Hermes Agent plugin"
 requires-python = ">=3.12"
 dependencies = []

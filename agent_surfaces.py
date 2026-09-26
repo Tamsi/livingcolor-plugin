@@ -99,8 +99,23 @@ def delivery_command(raw_args: str) -> str:
         if sub == "promote" and len(parts) >= 2:
             return tool_promote({"record_id": parts[1]})
         if sub == "gates":
-            data = routes.list_recent_events(20).model_dump(mode="json")
-            return "Recent delivery events:\n" + json.dumps(data, indent=2)[:1500]
+            overview = routes.get_delivery_overview()
+            pending = []
+            for work_order in overview.workOrders.items:
+                for gate in work_order.gates:
+                    if gate.status != "pending":
+                        continue
+                    pending.append(
+                        {
+                            "id": gate.id,
+                            "gateType": gate.gateType,
+                            "workOrderId": work_order.id,
+                            "jiraKey": work_order.jiraKey,
+                            "title": work_order.title,
+                            "createdAt": gate.createdAt,
+                        }
+                    )
+            return "Pending gates:\n" + json.dumps(pending, indent=2)[:1500]
         return _USAGE
     except Exception as exc:
         logger.exception("/delivery %s failed", sub)

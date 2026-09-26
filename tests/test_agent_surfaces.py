@@ -56,6 +56,40 @@ def test_overview_tool_returns_json(monkeypatch, tmp_path):
     assert "workOrders" in payload or "readiness" in payload or payload
 
 
+def test_delivery_gates_lists_pending_gates(monkeypatch, tmp_path):
+    ctx = _registered(monkeypatch, tmp_path)
+    init_db()
+    with connect() as conn:
+        now = utc_now_iso()
+        work_order_id = next_public_id(conn, "WO")
+        gate_id = next_public_id(conn, "GT")
+        conn.execute(
+            """
+            INSERT INTO work_orders (
+                id, jira_key, readiness_id, title, description, priority, status,
+                current_stage, confidence, created_at, updated_at
+            ) VALUES (?, 'AAC-1', NULL, 'Pending gate WO', '', '', 'awaiting_gate',
+                      'analysis_review', 0.9, ?, ?)
+            """,
+            (work_order_id, now, now),
+        )
+        conn.execute(
+            """
+            INSERT INTO gates (
+                id, work_order_id, gate_type, status, payload_json, created_at
+            ) VALUES (?, ?, 'analysis_plan', 'pending', '{}', ?)
+            """,
+            (gate_id, work_order_id, now),
+        )
+
+    out = ctx.commands["delivery"]("gates")
+    assert out.startswith("Pending gates:")
+    assert gate_id in out
+    assert "analysis_plan" in out
+    assert "AAC-1" in out
+    assert "Recent delivery events" not in out
+
+
 def test_promote_tool_supports_legacy_direct_route_call(monkeypatch, tmp_path):
     ctx = _registered(monkeypatch, tmp_path)
     install_phase25_project_mapping()

@@ -1,9 +1,10 @@
-# LivingColor Server (`livingcolor_server/`)
+# LivingColor Server (`lc_server/`)
 
 > Parent: [`../AGENTS.md`](../AGENTS.md) · Delivery domain: [`../delivery_runtime/AGENTS.md`](../delivery_runtime/AGENTS.md)
 
-The **LivingColor Server** is the delivery orchestration host. It owns execution,
-persistence, and external integrations. The desktop app is Mission Control only.
+The **LivingColor Server** is the delivery orchestration host. It owns execution
+bridges, persistence wiring, and external integrations. Mission Control UI lives
+in `ui/` and ships via `dashboard/`.
 
 ## Scope
 
@@ -13,24 +14,24 @@ persistence, and external integrations. The desktop app is Mission Control only.
 - Jira readiness integration (`integrations/jira_readiness.py`)
 - Agent runtime adapters (`agent_bridge/hermes_runtime.py`)
 - Project automation provisioning (`provisioning/`)
-- Future GitLab/Jira write integrations for delivery execution
+- GitLab/GitHub/Jira write integrations for delivery execution
+- Firebase / Team-mode bridges (`integrations/firestore_store.py`, `api/firebase_routes.py`)
 
 **Does not own:**
 
 - Delivery domain models and persistence → `delivery_runtime/`
-- HTTP route definitions → `delivery_runtime/api/routes.py` (mounted by server host)
-- Hermes agent loop internals → `agent/`, `run_agent.py`
-- Desktop UI → `apps/desktop/src/app/delivery/`
+- HTTP route definitions → `delivery_runtime/api/routes.py` (mounted by the host)
+- Mission Control UI → `ui/src/app/delivery/`
 
 ## Architecture
 
 ```text
-Desktop (Mission Control)
-  ⇄ HTTP /api/delivery/*
+Mission Control (ui/ → dashboard/dist)
+  ⇄ HTTP /api/plugins/livingcolor/… and /api/delivery/*
 LivingColor Server (this package)
   ⇄ delivery_runtime/
   ⇄ agent_bridge/ → Hermes (replaceable)
-  ⇄ integrations/ → Jira MCP (via Hermes tooling today)
+  ⇄ integrations/ → Jira / GitLab / GitHub MCP
 ```
 
 ## Load-bearing entry points
@@ -43,24 +44,17 @@ LivingColor Server (this package)
 | `agent_bridge/hermes_runtime.py` | Hermes-backed `AgentRuntimeBridge` |
 | `agent_bridge/hermes_developer.py` | Hermes `AIAgent` loop for patch generation |
 | `agent_bridge/hermes_analyst.py` | Hermes `AIAgent` loop for readiness analysis |
-| `agent_bridge/hermes_sprint_reporter.py` | Hermes `AIAgent` loop for sprint retrospectives posted to messaging |
+| `agent_bridge/hermes_sprint_reporter.py` | Hermes `AIAgent` loop for sprint retrospectives |
 | `agent_bridge/developer_backend.py` | Selects Hermes vs heuristic developer backend |
 | `provisioning/provisioner.py` | Writes per-project agent manifests and automation state |
-| `provisioning/prerequisites.py` | Validates Jira/GitLab/MCP prerequisites before setup |
-| `provisioning/gitlab_discovery.py` | Discovers GitLab repos for a Jira project key |
+| `provisioning/prerequisites.py` | Validates Jira/VCS/MCP prerequisites before setup |
 | `provisioning/template_renderer.py` | Renders bundled agent templates (`agent_templates/v1/`) |
-| `provisioning/upgrade.py` | Auto-upgrades stale manifest template versions |
 
 ## Invariants
 
-- Only this package (and deeper Hermes layers) may import `hermes_cli` or `tools` for delivery.
+- Only this package (and deeper Hermes layers) may import Hermes CLI/tooling for delivery.
 - `delivery_runtime/` must remain Hermes-free.
-- Product data lives under `~/.livingcolor/` via `livingcolor_constants.get_livingcolor_home()`.
-
-## Server host
-
-During development the server runs inside `hermes_cli/web_server.py`, which calls
-`bootstrap_livingcolor_server()` before mounting `/api/delivery/*`.
+- Product data lives under `~/.hermes/livingcolor/` via `lc_constants.get_livingcolor_home()`.
 
 ## Project automation provisioning
 
@@ -69,30 +63,29 @@ Provisioning is triggered via `POST /api/delivery/projects/{projectKey}/setup-au
 
 **Prerequisites** (checked by `provisioning/prerequisites.py`):
 
-- Jira project mapping exists in `~/.livingcolor/project_mapping.yaml`
-- Jira and GitLab MCP servers configured for the project
-- GitLab discovery returns at least one repo (or a default repo is set)
+- Jira project mapping exists in `~/.hermes/livingcolor/project_mapping.yaml`
+- Jira and VCS MCP servers configured for the project
+- VCS discovery returns at least one repo (or a default repo is set)
 
 On success, `ProjectAutomationProvisioner` writes:
 
 ```text
-~/.livingcolor/projects/{PROJECT_KEY}/
-  automation.yaml          # provisioned state (status, templateVersion, provisionedAt)
+~/.hermes/livingcolor/projects/{PROJECT_KEY}/
+  automation.yaml
   agents/
-    orchestrator.yaml        # AgentManifest for orchestrator role (declarative v1; not executed — see docs below)
-    analyst.yaml             # AgentManifest for readiness analysis
-    planner.yaml             # AgentManifest for Gate 1 planning
-    developer.yaml           # AgentManifest for patch generation
-    publisher.yaml           # AgentManifest for review-request publication
-    reporter.yaml            # AgentManifest for sprint retrospectives (messaging)
+    orchestrator.yaml   # declarative v1; not executed — OrchestrationEngine drives workflow
+    analyst.yaml
+    planner.yaml
+    developer.yaml
+    publisher.yaml
+    reporter.yaml
 ```
 
 Manifest schema and registry live in `delivery_runtime/agents/` (Hermes-free).
-Templates are bundled under `livingcolor_server/agent_templates/v1/`.
+Templates are bundled under `lc_server/agent_templates/v1/`.
 
 **Orchestrator vs OrchestrationEngine:** v1 workflow is driven by `OrchestrationEngine`
-(Python), not the orchestrator manifest. Before building an LLM orchestrator, read
-[`docs/delivery/orchestrator-llm-decision-guide.md`](../docs/delivery/orchestrator-llm-decision-guide.md).
+(Python), not the orchestrator manifest.
 
 **API surface:**
 
@@ -104,6 +97,5 @@ Templates are bundled under `livingcolor_server/agent_templates/v1/`.
 Returns `400` with `{ error: "prerequisites_missing", missing: [...] }` when setup
 cannot proceed. Returns `404` on GET when automation was never provisioned.
 
-Agent bridges (`hermes_analyst.py`, `hermes_developer.py`, `hermes_sprint_reporter.py`) load manifests via
-`AgentManifestRegistry` when automation is ready; they fall back to legacy
-prompts when manifests are absent (backward compatibility).
+Agent bridges load manifests via `AgentManifestRegistry` when automation is ready;
+they fall back to legacy prompts when manifests are absent.
